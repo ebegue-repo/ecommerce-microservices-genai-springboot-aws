@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ecommerce_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - ecommerce-network
+
+  product-service:
+    build:
+      context: .
+      dockerfile: product-service/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      DB_URL: jdbc:postgresql://postgres:5432/ecommerce_db
+      DB_USERNAME: postgres
+      DB_PASSWORD: password
+    depends_on:
+      - postgres
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Placeholder for future services
+  # user-service:
+  #   build:
+  #     context: .
+  #     dockerfile: user-service/Dockerfile
+  #   ports:
+  #     - "8081:8080"
+  #   environment:
+  #     SPRING_PROFILES_ACTIVE: production
+  #     DB_URL: jdbc:postgresql://postgres:5432/ecommerce_db
+  #     DB_USERNAME: postgres
+  #     DB_PASSWORD: password
+  #   depends_on:
+  #     - postgres
+  #   networks:
+  #     - ecommerce-network
+
+  # order-service:
+  #   build:
+  #     context: .
+  #     dockerfile: order-service/Dockerfile
+  #   ports:
+  #     - "8082:8080"
+  #   environment:
+  #     SPRING_PROFILES_ACTIVE: production
+  #     DB_URL: jdbc:postgresql://postgres:5432/ecommerce_db
+  #     DB_USERNAME: postgres
+  #     DB_PASSWORD: password
+  #   depends_on:
+  #     - postgres
+  #   networks:
+  #     - ecommerce-network
+
+  # gateway-service:
+  #   build:
+  #     context: .
+  #     dockerfile: gateway-service/Dockerfile
+  #   ports:
+  #     - "8090:8080"
+  #   environment:
+  #     SPRING_PROFILES_ACTIVE: production
+  #   depends_on:
+  #     - product-service
+  #     - user-service
+  #     - order-service
+  #   networks:
+  #     - ecommerce-network
+
+volumes:
+  postgres_data:
+
+networks:
+  ecommerce-network:
+    driver: bridge

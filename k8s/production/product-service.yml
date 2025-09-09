@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: product-service
+  namespace: production
+  labels:
+    app: product-service
+    environment: production
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: product-service
+  template:
+    metadata:
+      labels:
+        app: product-service
+        environment: production
+    spec:
+      containers:
+      - name: product-service
+        image: YOUR_ECR_REGISTRY/ecommerce-product-service:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "production"
+        - name: DB_URL
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: url
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: username
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secret
+              key: password
+        livenessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /actuator/health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: product-service
+  namespace: production
+  labels:
+    app: product-service
+spec:
+  selector:
+    app: product-service
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: product-service-ingress
+  namespace: production
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+spec:
+  rules:
+  - host: api.ecommerce.example.com
+    http:
+      paths:
+      - path: /api/v1/products
+        pathType: Prefix
+        backend:
+          service:
+            name: product-service
+            port:
+              number: 80
